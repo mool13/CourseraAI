@@ -1,0 +1,59 @@
+---
+title: "Weight Lifting Exercise Prediction"
+author: "Your Name"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(caret)
+library(dplyr)
+library(randomForest)
+library(rpart)
+library(gbm)
+
+# Load data
+training_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_url  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_raw <- read.csv(training_url, na.strings = c("NA", "", "#DIV/0!"))
+test_raw  <- read.csv(testing_url, na.strings = c("NA", "", "#DIV/0!"))
+
+# Remove columns with mostly NA and irrelevant features
+train_clean <- train_raw %>%
+  select_if(function(x) mean(is.na(x)) == 0) %>%
+  select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window))
+
+test_clean <- test_raw %>%
+  select(names(train_clean)[names(train_clean) %in% names(test_raw)])
+
+set.seed(1234)
+inTrain <- createDataPartition(train_clean$classe, p = 0.7, list = FALSE)
+training <- train_clean[inTrain, ]
+validation <- train_clean[-inTrain, ]
+
+control <- trainControl(method = "cv", number = 5)
+
+# Random Forest (recommended)
+set.seed(1234)
+rf_model <- train(classe ~ ., data = training, method = "rf", trControl = control)
+rf_model
+
+# Predict on validation set
+rf_pred <- predict(rf_model, validation)
+confusionMatrix(rf_pred, validation$classe)
+
+1 - confusionMatrix(rf_pred, validation$classe)$overall["Accuracy"]
+
+# Function to save predictions
+pml_write_files <- function(predictions) {
+  for (i in 1:length(predictions)) {
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(predictions[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+
+# Call the function
+pml_write_files(final_pred)
+
